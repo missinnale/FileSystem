@@ -32,6 +32,7 @@
 const int globalMaxBlocks = 10000;
 const int globalMaxFileSize = 4096;
 char* globalBlockName = "fusedata.";
+char* globalFilePath = "/Documents/FileSystem";
 
 char* concat(char* first, char* second){
   char* result = malloc(strlen(first) + strlen(second) + 1);
@@ -40,7 +41,7 @@ char* concat(char* first, char* second){
   return result;
 }
 
-void* nemInit(){
+void* nemInit(struct fuse_conn_info* conn){
   printf("Inside Init\n");
   char* fileNameStart = concat("c:\\", globalBlockName);
   char* fileNameComplete = concat(fileNameStart, "0");
@@ -63,8 +64,67 @@ void* nemInit(){
   }
 }
 
+int nemGetattr(const char* path, struct stat* stbuf){
+  int res = 0;
+
+  memset(stbuf, 0, sizeof(struct stat));
+  if(strcmp(path, "/") == 0){
+    stbuf -> st_mode = S_IFDIR | 0755;
+    stbuf -> st_nlink = 2;
+  }
+  else if(strcmp(path, globalFilePath) == 0){
+    stbuf -> st_mode = S_IFREG | 0444;
+    stbuf -> st_nlink = 1;
+    stbuf -> st_size = strlen(globalFilePath);
+  }
+  else{
+    res = -ENOENT;
+  }
+  return res;
+}
+
+static int nemReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
+                         off_t offset, struct fuse_file_info *fi)
+{
+        (void) offset;
+        (void) fi;
+        if (strcmp(path, "/") != 0)
+                return -ENOENT;
+        filler(buf, ".", NULL, 0);
+        filler(buf, "..", NULL, 0);
+        filler(buf, globalFilePath + 1, NULL, 0);
+        return 0;
+}
+static int nemOpen(const char *path, struct fuse_file_info *fi)
+{
+        if (strcmp(path, globalFilePath) != 0)
+                return -ENOENT;
+        if ((fi->flags & 3) != O_RDONLY)
+                return -EACCES;
+        return 0;
+}
+static int nemRead(const char *path, char *buf, size_t size, off_t offset,
+                    struct fuse_file_info *fi)
+{
+        int fd;
+        int res;
+        (void) fi;
+        fd = open(path, O_RDONLY);
+        if (fd == -1)
+                return -errno;
+        res = pread(fd, buf, size, offset);
+        if (res == -1)
+                res = -errno;
+        close(fd);
+        return res;
+}
+
 struct fuse_operations nemOperations = {
-  .init = nemInit
+  //.init = nemInit,
+  .getattr = nemGetattr,
+  .readdir = nemReaddir,
+  .open    = nemOpen,
+  .read    = nemRead,
 };
 
 int main(int argc, char* argv[]){
