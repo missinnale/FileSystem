@@ -1,6 +1,6 @@
 /*
   Elan Moyal
-  gcc -Wall fileSystem.c `pkg-config fuse --cflags --libs` -o fileSystem
+  gcc -Wall filesystem.c `pkg-config fuse --cflags --libs` -o filesystem
 */
 
 #define FUSE_USE_VERSION 30
@@ -32,7 +32,7 @@
 const int globalMaxBlocks = 10000;
 const int globalMaxFileSize = 4096;
 char* globalBlockName = "fusedata.";
-char* globalFilePath = "/Documents/FileSystem";
+char* globalFilePath = "/filesystem";
 
 char* concat(char* first, char* second){
   char* result = malloc(strlen(first) + strlen(second) + 1);
@@ -43,18 +43,18 @@ char* concat(char* first, char* second){
 
 void* nemInit(struct fuse_conn_info* conn){
   printf("Inside Init\n");
-  char* fileNameStart = concat("c:\\", globalBlockName);
+  char* fileNameStart = concat("c:\\", globalBlockName); // /tmp/fuse
   char* fileNameComplete = concat(fileNameStart, "0");
   FILE* fileSystem = fopen(fileNameComplete, "r");
   if(fileSystem != NULL){
     free(fileNameComplete);
     fclose(fileSystem);
-    return;
+    return NULL;
   }
   fclose(fileSystem);
   int i;
   for(i = 0; i < globalMaxBlocks; ++i){
-    char* num;
+    char* num = "";
     sprintf(num, "%d", i);
     char* tmpName = concat(fileNameStart, num);
     free(num);
@@ -62,6 +62,7 @@ void* nemInit(struct fuse_conn_info* conn){
     fwrite("", sizeof(globalMaxFileSize), sizeof(1), fileSystem);
     fclose(fileSystem);
   }
+  return NULL;
 }
 
 int nemGetattr(const char* path, struct stat* stbuf){
@@ -73,9 +74,9 @@ int nemGetattr(const char* path, struct stat* stbuf){
     stbuf -> st_nlink = 2;
   }
   else if(strcmp(path, globalFilePath) == 0){
-    stbuf -> st_mode = S_IFREG | 0444;
+    stbuf -> st_mode = S_IFREG | 0777;
     stbuf -> st_nlink = 1;
-    stbuf -> st_size = strlen(globalFilePath);
+    stbuf -> st_size = globalMaxFileSize * globalMaxBlocks;
   }
   else{
     res = -ENOENT;
@@ -130,6 +131,6 @@ struct fuse_operations nemOperations = {
 int main(int argc, char* argv[]){
 
   printf("Inside Main\n");
-
+  umask(0);
   return fuse_main(argc, argv, &nemOperations, NULL);
 }
