@@ -1,6 +1,10 @@
 /*
   Elan Moyal
   gcc -Wall filesystem.c `pkg-config fuse --cflags --libs` -o filesystem
+  for permission issues:
+  sudo chown root /usr/local/bin/fusermount
+  sudo chmod u+s /usr/local/bin/fusermount
+
 */
 
 #define FUSE_USE_VERSION 30
