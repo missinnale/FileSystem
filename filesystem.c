@@ -1,6 +1,6 @@
 /*
   Elan Moyal
-  gcc -Wall filesystem.c `pkg-config fuse --cflags --libs` -o filesystem
+  gcc -g -Wall filesystem.c `pkg-config fuse --cflags --libs` -o filesystem
   for permission issues:
   sudo chown root /usr/local/bin/fusermount
   sudo chmod u+s /usr/local/bin/fusermount
@@ -36,7 +36,7 @@
 const int globalMaxBlocks = 10000;
 const int globalMaxFileSize = 4096;
 char* globalBlockName = "fusedata.";
-char* globalFilePath = "/filesystem";
+char* globalFilePath = "/home/elan/Documents/FileSystem/temp/fusedata/";
 
 char* concat(char* first, char* second){
   char* result = malloc(strlen(first) + strlen(second) + 1);
@@ -45,31 +45,34 @@ char* concat(char* first, char* second){
   return result;
 }
 
-void* nemInit(struct fuse_conn_info* conn){
+void* nemInit(){
   printf("Inside Init\n");
-  char* fileNameStart = concat("c:\\", globalBlockName); // /tmp/fuse
+  char* fileNameStart = concat(globalFilePath, globalBlockName); // /tmp/fuse
   char* fileNameComplete = concat(fileNameStart, "0");
-  FILE* fileSystem = fopen(fileNameComplete, "r");
-  if(fileSystem != NULL){
+  FILE* fd = fopen(fileNameComplete, "r");
+  if(fd != NULL){
+    fclose(fd);
     free(fileNameComplete);
-    fclose(fileSystem);
     return NULL;
   }
-  fclose(fileSystem);
+  free(fd);
   int i;
   for(i = 0; i < globalMaxBlocks; ++i){
-    char* num = "";
+    char num[6];
     sprintf(num, "%d", i);
     char* tmpName = concat(fileNameStart, num);
-    free(num);
-    fileSystem = fopen(tmpName, "wb");
-    fwrite("", sizeof(globalMaxFileSize), sizeof(1), fileSystem);
-    fclose(fileSystem);
+    printf("Inside Loop\n");
+    fd = fopen(tmpName, "w+");
+    char* buffer[globalMaxFileSize];
+    memset(buffer, "0", globalMaxFileSize);
+    fwrite(buffer, globalMaxFileSize, sizeof(char), fd);
+    fclose(fd);
   }
   return NULL;
 }
 
 int nemGetattr(const char* path, struct stat* stbuf){
+  /*
   int res = 0;
 
   memset(stbuf, 0, sizeof(struct stat));
@@ -86,6 +89,12 @@ int nemGetattr(const char* path, struct stat* stbuf){
     res = -ENOENT;
   }
   return res;
+  */
+  int res;
+res = lstat(path, stbuf);
+if (res == -1)
+        return -errno;
+return 0;
 }
 
 static int nemReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -136,5 +145,6 @@ int main(int argc, char* argv[]){
 
   printf("Inside Main\n");
   umask(0);
+  nemInit();
   return fuse_main(argc, argv, &nemOperations, NULL);
 }
