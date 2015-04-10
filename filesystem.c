@@ -36,7 +36,7 @@
 const int globalMaxBlocks = 10000;
 const int globalMaxFileSize = 4096;
 char* globalBlockName = "fusedata.";
-char* globalFilePath = "/home/elan/Documents/FileSystem/temp/fusedata/";
+char* globalFilePath = "/fusedata/";
 
 char* concat(char* first, char* second){
   char* result = malloc(strlen(first) + strlen(second) + 1);
@@ -48,26 +48,81 @@ char* concat(char* first, char* second){
 void* nemInit(){
   printf("Inside Init\n");
   char* fileNameStart = concat(globalFilePath, globalBlockName); // /tmp/fuse
-  char* fileNameComplete = concat(fileNameStart, "0");
-  FILE* fd = fopen(fileNameComplete, "r");
+  char* superBlock = concat(fileNameStart, "0");
+  FILE* fd = fopen(superBlock, "r");
   if(fd != NULL){
     fclose(fd);
-    free(fileNameComplete);
+    free(superBlock);
     return NULL;
   }
-  free(fd);
+  fclose(fd);
+
+  //Create the 10,000 files with 0's in them via byte write
   int i;
-  for(i = 0; i < globalMaxBlocks; ++i){
+  for(i = 0; i < 1; ++i){
     char num[6];
     sprintf(num, "%d", i);
     char* tmpName = concat(fileNameStart, num);
     printf("Inside Loop\n");
-    fd = fopen(tmpName, "w+");
+    fd = fopen(tmpName, "wb");
     char* buffer[globalMaxFileSize];
     memset(buffer, "0", globalMaxFileSize);
     fwrite(buffer, globalMaxFileSize, sizeof(char), fd);
     fclose(fd);
+    free(num);
   }
+
+  //overwrite the superBlock to contain correct information
+  fd = fopen(superBlock, "w+");
+  fprintf(fd, "{creationTime:%ld, mounted: %i, devId: %i, freeStart: %i,freeEnd: %i, root: %i, maxBlocks: %i}\n", time(NULL), 1, 20, 1, 25, 26, globalMaxBlocks);
+  fclose(fd);
+  free(superBlock);
+
+  //overwrite the first free block to contain correct information
+  char* freeBlockStart = concat(fileNameStart, "1");
+  for(i = 27; i < 400; ++i){
+    if(i == 27){
+      fd = fopen(freeBlockStart, "w+");
+      fprintf(fd, "{ %d", i);
+      fclose(fd);
+    }
+    else if(i == 399){
+      fd = fopen(freeBlockStart, "a+");
+      fprintf(fd, ", %d}", i);
+      fclose(fd);
+    }
+    fd = fopen(freeBlockStart, "a+");
+    fprintf(fd, ", %d", i);
+    fclose(fd);
+
+  }
+
+  //overwrite the remaining free blocks to contain correct information
+  int j;
+  for(j = 2; j < 26; ++j){
+    char* num[6];
+    sprintf(num, "%d", j);
+    char* freeBlock = concat(fileNameStart, num);
+    for(i = 0; i < 400; ++i){
+      if(i == 0){
+        fd = fopen(freeBlock, "w+");
+        fprintf(fd, "{ %d", ((j-1) * 400) + i);
+        fclose(fd);
+      }
+      else if(i == 399){
+        fd = fopen(freeBlock, "a+");
+        fprintf(fd, ", %d}", ((j - 1) * 400) + i );
+        fclose(fd);
+      }
+      fd = fopen(freeBlock, "a+");
+      fprintf(fd, ", %d", ((j - 1) * 400) + i );
+      fclose(fd);
+    }
+  }
+
+  //overwrite the root block to contain correct info
+  
+
   return NULL;
 }
 
