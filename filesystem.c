@@ -45,6 +45,8 @@ char* concat(char* first, char* second){
   return result;
 }
 
+
+
 void* nemInit(){
   printf("Inside Init\n");
   char* fileNameStart = concat(globalFilePath, globalBlockName); // /tmp/fuse
@@ -60,7 +62,7 @@ void* nemInit(){
   //Create the 10,000 files with 0's in them via byte write
   printf("Creating Files\n");
   int i;
-  for(i = 0; i < 1; ++i){
+  for(i = 0; i < globalMaxBlocks; ++i){
     char num[6];
     sprintf(num, "%d", i);
     char* tmpName = concat(fileNameStart, num);
@@ -81,7 +83,7 @@ void* nemInit(){
   free(superBlock);
 
   //overwrite the first free block to contain correct information
-  printf("Creating Free Block List\n", );
+  printf("Creating Free Block List\n");
   char* freeBlockStart = concat(fileNameStart, "1");
   for(i = 27; i < 400; ++i){
     if(i == 27){
@@ -193,6 +195,15 @@ static int nemRead(const char *path, char *buf, size_t size, off_t offset,
                 res = -errno;
         close(fd);
         return res;
+}
+
+int nemUnlink(const char* path){
+  /*TODO: parse through path name to get containing folder,
+          remove filename_to_inode_dict entry for file in containing folder,
+          decrease linkcount by 1 of containing folder,
+          add location of file to free block list,
+          change path of file to the path of trashbin
+  */
 }
 
 struct fuse_operations nemOperations = {
