@@ -58,12 +58,12 @@ void* nemInit(){
   fclose(fd);
 
   //Create the 10,000 files with 0's in them via byte write
+  printf("Creating Files\n");
   int i;
   for(i = 0; i < 1; ++i){
     char num[6];
     sprintf(num, "%d", i);
     char* tmpName = concat(fileNameStart, num);
-    printf("Inside Loop\n");
     fd = fopen(tmpName, "wb");
     char* buffer[globalMaxFileSize];
     memset(buffer, "0", globalMaxFileSize);
@@ -71,14 +71,17 @@ void* nemInit(){
     fclose(fd);
     free(num);
   }
+  printf("Done Creating Files\n");
 
   //overwrite the superBlock to contain correct information
+  printf("Creating Super Block\n");
   fd = fopen(superBlock, "w+");
   fprintf(fd, "{creationTime:%ld, mounted: %i, devId: %i, freeStart: %i,freeEnd: %i, root: %i, maxBlocks: %i}\n", time(NULL), 1, 20, 1, 25, 26, globalMaxBlocks);
   fclose(fd);
   free(superBlock);
 
   //overwrite the first free block to contain correct information
+  printf("Creating Free Block List\n", );
   char* freeBlockStart = concat(fileNameStart, "1");
   for(i = 27; i < 400; ++i){
     if(i == 27){
@@ -121,7 +124,11 @@ void* nemInit(){
   }
 
   //overwrite the root block to contain correct info
-  
+  printf("Creating Root Block\n");
+  char* rootBlock = concat(fileNameStart, "26");
+  fd = fopen(rootBlock, "w+");
+  fprintf(fd, "{size:%d, uid:%d, gid:%d, mode:%d, atime:%ld, ctime:%ld, mtime:%ld, linkcount:%d, filename_to_inode_dict: {d:.:%d, d:..:%d}}", 0, 1, 1, S_IFDIR | S_IRWXU , time(NULL), time(NULL), time(NULL), 2, 26, 26);
+  fclose(fd);
 
   return NULL;
 }
