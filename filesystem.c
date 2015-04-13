@@ -198,7 +198,29 @@ int nemMkdir(const char* path, mode_t mode){
           Add location to parent directory,
           Assign correct information
   */
-  
+  bool flag = false;
+  char* fileLocations;
+  char* freeBlock;
+  int j;
+  for(j = 1; j < 26; ++j){
+    char* freeBlockPath = concat(concat(globalFilePath, globalBlockName), j);
+    FILE* fd = fopen(freeBlockPath, "r+");
+    fscanf(fd, "{size:%*s, uid:%*s, gid:%*s, mode:%*s, atime:%*s, ctime:%*s, mtime:%*s, linkcount:%*s, filename_to_inode_dict:{%s}", fileLocations);
+    if(strcmp(fileLocations, "{}") == 0 ){continue;}
+    scanf("{%s, %*s}", freeBlock);
+    break;
+  }
+  FILE* fd = fopen(parentPath(path), "r+");
+  struct inode* directory;
+  fscanf(fd, "{size:%s, uid:%s, gid:%s, mode:%s, atime:%s, ctime:%s, mtime:%s, linkcount:%s, filename_to_inode_dict:{%s}}", directory->size, directory->uid, directory->gid, directory->mode, directory->atime, directory->ctime, directory->mtime, directory->linkcount, directory->filename_to_inode_dict);
+  char* additionalEntry = malloc(100);
+  additionalEntry = "d:";
+  strcat(additionalEntry, childName(path));
+  strcat(additionalEntry, freeBlock);
+  strcat(directory->filename_to_inode_dict, additionalEntry);
+  char* link[6];
+  sprintf(link, "%d", atoi(directory->linkcount) + 1);
+  fprintf(fd, "{size:%s, uid:%s, gid:%s, mode%s, atime:%s, ctime%s, mtime%s, linkcount:%s, filename_to_inode_dict:{%s}}",);
 }
 
 int nemGetattr(const char* path, struct stat* stbuf){
