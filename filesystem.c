@@ -38,6 +38,32 @@ const int globalMaxFileSize = 4096;
 char* globalBlockName = "fusedata.";
 char* globalFilePath = "/fusedata/";
 
+struct inode{
+  char* size;
+  char* uid;
+  char* gid;
+  char* mode;
+  char* atime;
+  char* ctime;
+  char* mtime;
+  char* linkcount;
+  char* filename_to_inode_dict;
+};
+
+struct fileInode{
+  char* size;
+  char* uid;
+  char* gid;
+  char* mode;
+  char* linkcount;
+  char* atime;
+  char* ctime;
+  char* mtime;
+  char* indirect;
+  char* location;
+  char* name;
+};
+
 char* concat(char* first, char* second){
   char* result = malloc(strlen(first) + strlen(second) + 1);
   strcpy(result, first);
@@ -47,9 +73,41 @@ char* concat(char* first, char* second){
 
 
 
+char* parentPath(char* childPath){
+  char* root = "/";
+  char* parentPath = malloc(strlen(childPath));
+  char* tmp = malloc(strlen(childPath));
+  tmp = strtok(childPath, "/");
+  if(strlen(tmp + 1) != strlen(childPath)){
+    while(tmp != NULL){
+      parentPath = tmp;
+      tmp = strtok(NULL, "/");
+    }
+    strcat(root, parentPath);
+    parentPath = root;
+    free(root);
+    free(tmp);
+  }
+  else{
+    parentPath = childPath;
+  }
+
+  return parentPath;
+}
+
+struct fileInode* fileInfo(char* filePath){
+  struct fileInode* file = malloc(globalMaxFileSize);
+  FILE* fd = fopen(filePath, "r+");
+  fscanf(fd, "{size:%s, uid:%s, gid:%s, mode:%s, linkcount:%s, atime:%s, ctime:%s, mtime:%s, indirect:%s, location:%s, name:%s}", file->size, file->uid, file->gid, file->mode, file->linkcount, file->atime, file->ctime, file->mtime, file->indirect, file->location, file->name);
+  fclose(fd);
+  return file;
+}
+
+
+
 void* nemInit(){
   printf("Inside Init\n");
-  char* fileNameStart = concat(globalFilePath, globalBlockName); // /tmp/fuse
+  char* fileNameStart = concat(globalFilePath, globalBlockName);
   char* superBlock = concat(fileNameStart, "0");
   FILE* fd = fopen(superBlock, "r");
   if(fd != NULL){
@@ -135,6 +193,14 @@ void* nemInit(){
   return NULL;
 }
 
+int nemMkdir(const char* path, mode_t mode){
+  /*TODO: Pull value from free block list,
+          Add location to parent directory,
+          Assign correct information
+  */
+  
+}
+
 int nemGetattr(const char* path, struct stat* stbuf){
   /*
   int res = 0;
@@ -204,6 +270,52 @@ int nemUnlink(const char* path){
           add location of file to free block list,
           change path of file to the path of trashbin
   */
+  char* parent = parentPath(path);
+  FILE* fd = fopen(parent, "r+");
+  struct inode* directory;
+  fscanf(fd, "{size:%s, uid:%s, gid:%s, mode:%s, atime:%s, ctime:%s, mtime:%s, linkcount:%s, filename_to_inode_dict:{%s}", directory->size, directory->uid, directory->gid, directory->mode, directory->atime, directory->ctime, directory->mtime, directory->linkcount, directory->filename_to_inode_dict);
+  fclose(fd);
+  fd = fopen(parent, "w+");
+
+  char* tmp = malloc(directory->filename_to_inode_dict);
+  char* fileArray = malloc(directory->filename_to_inode_dict);
+  struct fileInode* file = fileInfo(path);
+  char* fileName = file->name;
+  char* fileLocation = file->location;
+  tmp = strtok(directory->filename_to_inode_dict, ",{}");
+  char* fileEntry = concat(concat(fileName, ":"), fileLocation);
+  while(tmp != NULL){
+    if(strcmp(tmp, concat("d:", fileEntry)==0 || strcmp(tmp, concat("f:", fileEntry)==0))){
+      continue;
+    }
+    strcat(fileArray, ",");
+    strcat(fileArray, tmp);
+  }
+  directory->filename_to_inode_dict = fileArray;
+  char* link[6];
+  sprintf(link, "%i", atoi(directory->linkcount) - 1);
+  fprintf(fd,"size:%s, uid:%s, gid:%s, mode:%s, atime:%s, ctime:%ld, mtime:%ld, linkcount:%s, filename_to_inode_dict:{%s}", directory->size, directory->uid, directory->gid, directory->mode, directory->atime, time(NULL), time(NULL), link , directory->filename_to_inode_dict);
+  fclose(fd);
+
+  int j;
+  int i = 0;
+
+  for(j = 1; j < 26; ++j){
+    if(((atoi(fileLocation) + 399)/ 400) == j){
+      char* freeBlock = concat(concat(globalFilePath, globalBlockName), j);
+      fd = fopen(freeBlock,"a+");
+      fputs(fileLocation, fd);
+      fclose(fd);
+      free(freeBlock);
+    }
+  }
+  fd = fopen(concat(concate(globalFilePath,globalBlockName), fileLocation), "w+");
+  char* buffer[globalMaxFileSize];
+  memset(buffer, "0", globalMaxFileSize);
+  fwrite(buffer, globalMaxFileSize, sizeof(char), fd);
+  free(buffer);
+  fclose(fd);
+
 }
 
 struct fuse_operations nemOperations = {
