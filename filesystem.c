@@ -80,7 +80,9 @@ char* parentPath(char* childPath){
   tmp = strtok(childPath, "/");
   if(strlen(tmp + 1) != strlen(childPath)){
     while(tmp != NULL){
-      parentPath = tmp;
+      if(strlen(parentPath) + strlen(tmp) + 1 == strlen(childPath) ){break;}
+      strcat(parentPath ,"/");
+      strcat(parentPath, tmp);
       tmp = strtok(NULL, "/");
     }
     strcat(root, parentPath);
@@ -95,6 +97,37 @@ char* parentPath(char* childPath){
   return parentPath;
 }
 
+char* childName(char* childPath){
+  if(strcmp(childPath, "/") == 0){return childPath;}
+  char* previous = malloc(strlen(childPath));
+  char* current = malloc(strlen(childPath));
+  current = strtok(childPath, "/");
+  while(current != NULL){
+    previous = current;
+    current = strtok(NULL, "/");
+  }
+  return previous;
+}
+
+char* matchNameToLocation(char* name, char* nodeData){
+  char* fusedataName = NULL;
+  char* comparerName = malloc(100);
+  char* fusedataNumber = malloc(5);
+  char* tmp = malloc(strlen(nodeData));
+  tmp = strtok(nodeData, ",");
+  while(tmp != NULL){
+    scanf("%*s:%s:%s", comparerName, fusedataNumber);
+    if(name == comparerName){
+      fusedataName = concat("/fusedata/fusedata.", fusedataNumber);
+      break;
+    }
+  }
+  free(comparerName);
+  free(fusedataNumber);
+  free(tmp);
+  return fusedataName;
+}
+
 struct fileInode* fileInfo(char* filePath){
   struct fileInode* file = malloc(globalMaxFileSize);
   FILE* fd = fopen(filePath, "r+");
@@ -103,9 +136,33 @@ struct fileInode* fileInfo(char* filePath){
   return file;
 }
 
+int nemCreate(char* path, mode_t mode, struct fuse_file_info* fi){
+  /*TODO: Open path to file location,
+          Obtain next free block,
+          Add reference to file in directory,
+          Add file inode with appropriate info
+  */
+  return 0;
+}
+
+void* nemDestroy(){
+  /*TODO: Close open file,
+
+  */
+  return NULL;
+}
+
+//from fusexmp.c
+int nemGetattr(const char* path, struct stat* stbuf){
+  int res;
+res = lstat(path, stbuf);
+if (res == -1)
+        return -errno;
+return 0;
+}
 
 
-void* nemInit(){
+void* nemInit(struct fuse_conn_info* conn){
   printf("Inside Init\n");
   char* fileNameStart = concat(globalFilePath, globalBlockName);
   char* superBlock = concat(fileNameStart, "0");
@@ -129,7 +186,6 @@ void* nemInit(){
     memset(buffer, "0", globalMaxFileSize);
     fwrite(buffer, globalMaxFileSize, sizeof(char), fd);
     fclose(fd);
-    free(num);
   }
   printf("Done Creating Files\n");
 
@@ -169,16 +225,16 @@ void* nemInit(){
     for(i = 0; i < 400; ++i){
       if(i == 0){
         fd = fopen(freeBlock, "w+");
-        fprintf(fd, "{ %d", ((j-1) * 400) + i);
+        fprintf(fd, "{%d", ((j-1) * 400) + i);
         fclose(fd);
       }
       else if(i == 399){
         fd = fopen(freeBlock, "a+");
-        fprintf(fd, ", %d}", ((j - 1) * 400) + i );
+        fprintf(fd, ",%d}", ((j - 1) * 400) + i );
         fclose(fd);
       }
       fd = fopen(freeBlock, "a+");
-      fprintf(fd, ", %d", ((j - 1) * 400) + i );
+      fprintf(fd, ",%d", ((j - 1) * 400) + i );
       fclose(fd);
     }
   }
@@ -193,12 +249,19 @@ void* nemInit(){
   return NULL;
 }
 
+int nemLink(char* from, char* to){
+  /*TODO: Parse out 'to' path to get filename & fusedata number,
+          Open 'from' path and add linkcount and info to dict
+  */
+  return 0;
+}
+
 int nemMkdir(const char* path, mode_t mode){
   /*TODO: Pull value from free block list,
           Add location to parent directory,
           Assign correct information
   */
-  bool flag = false;
+  //Get value from free block list
   char* fileLocations;
   char* freeBlock;
   int j;
@@ -210,57 +273,33 @@ int nemMkdir(const char* path, mode_t mode){
     scanf("{%s, %*s}", freeBlock);
     break;
   }
-  FILE* fd = fopen(parentPath(path), "r+");
+
+  //Add location to parent directory
+  int parentBlock = nemOpendir(parentPath(path));
   struct inode* directory;
+  FILE* fd = fopen(concat("/fusedata/fusedata.", parentBlock), "r+");
   fscanf(fd, "{size:%s, uid:%s, gid:%s, mode:%s, atime:%s, ctime:%s, mtime:%s, linkcount:%s, filename_to_inode_dict:{%s}}", directory->size, directory->uid, directory->gid, directory->mode, directory->atime, directory->ctime, directory->mtime, directory->linkcount, directory->filename_to_inode_dict);
   char* additionalEntry = malloc(100);
-  additionalEntry = "d:";
+  additionalEntry = ",d:";
   strcat(additionalEntry, childName(path));
+  strcat(additionalEntry, ":");
   strcat(additionalEntry, freeBlock);
   strcat(directory->filename_to_inode_dict, additionalEntry);
   char* link[6];
   sprintf(link, "%d", atoi(directory->linkcount) + 1);
-  fprintf(fd, "{size:%s, uid:%s, gid:%s, mode%s, atime:%s, ctime%s, mtime%s, linkcount:%s, filename_to_inode_dict:{%s}}",);
+  fprintf(fd, "{size:%s, uid:%s, gid:%s, mode%s, atime:%s, ctime%ld, mtime%ld, linkcount:%s, filename_to_inode_dict:{%s}}",directory->size, directory->uid, directory->gid, directory->mode,directory->atime, time(NULL), time(NULL), link, directory->filename_to_inode_dict);
+  fclose(fd);
+  free(additionalEntry);
+
+  //Assign info to new directory
+  fd = fopen("/fusedata/fusedata.", "w+");
+  fprintf(fd, "{size:%s, uid:%s, gid:%s, mode%s, atime:%s, ctime%ld, mtime%ld, linkcount:%s, filename_to_inode_dict:{%s}}","4096", "1", "1", mode,time(NULL), time(NULL), time(NULL), "0", "");
+  fclose(fd);
+
+
 }
 
-int nemGetattr(const char* path, struct stat* stbuf){
-  /*
-  int res = 0;
-
-  memset(stbuf, 0, sizeof(struct stat));
-  if(strcmp(path, "/") == 0){
-    stbuf -> st_mode = S_IFDIR | 0755;
-    stbuf -> st_nlink = 2;
-  }
-  else if(strcmp(path, globalFilePath) == 0){
-    stbuf -> st_mode = S_IFREG | 0777;
-    stbuf -> st_nlink = 1;
-    stbuf -> st_size = globalMaxFileSize * globalMaxBlocks;
-  }
-  else{
-    res = -ENOENT;
-  }
-  return res;
-  */
-  int res;
-res = lstat(path, stbuf);
-if (res == -1)
-        return -errno;
-return 0;
-}
-
-static int nemReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
-                         off_t offset, struct fuse_file_info *fi)
-{
-        (void) offset;
-        (void) fi;
-        if (strcmp(path, "/") != 0)
-                return -ENOENT;
-        filler(buf, ".", NULL, 0);
-        filler(buf, "..", NULL, 0);
-        filler(buf, globalFilePath + 1, NULL, 0);
-        return 0;
-}
+//from hello.c
 static int nemOpen(const char *path, struct fuse_file_info *fi)
 {
         if (strcmp(path, globalFilePath) != 0)
@@ -269,6 +308,36 @@ static int nemOpen(const char *path, struct fuse_file_info *fi)
                 return -EACCES;
         return 0;
 }
+
+int nemOpendir(char* path, struct fuse_file_info* fi){
+  /*TODO: Start at root and locate first part of path,
+          Find all subsequent portions of path,
+          assign opened file off located path to file handle
+  */
+  if(strcmp(path, "/") == 0){fi->fh = 26; return fi->fh;}
+  char* fileLocations = malloc(globalMaxFileSize);
+  FILE* fd = fopen("/fusedata/fusedata.26", "r+");
+  fscanf(fd, "{size:%*s, uid:%*s, gid:%*s, mode:%*s, atime:%*s, ctime:%*s, mtime:%*s, linkcount:%*s, filename_to_inode_dict:{%s}", fileLocations);
+  fclose(fd);
+  char* fuseName;
+  char* tmp = malloc(strlen(path));
+  tmp = strtok(path, "/");
+  while(tmp != NULL){
+    fuseName = matchNameToLocation(tmp, fileLocations);
+    free(fileLocations);
+    if(fuseName == NULL){ fi->fh = NULL; return fi->fh;/*return error*/}
+    fd = fopen(fuseName, "r+");
+    fscanf(fd, "{size:%*s, uid:%*s, gid:%*s, mode:%*s, atime:%*s, ctime:%*s, mtime:%*s, linkcount:%*s, filename_to_inode_dict:{%s}", fileLocations);
+    tmp = strtok(NULL, "/");
+  }
+  int fuseNumber = malloc(globalMaxFileSize);
+  scanf(fuseName, "/fusedata/fusedata.%d", fuseNumber);
+  free(fuseName);
+  fi->fh = fuseNumber;
+  return fi->fh;
+}
+
+//from hello.c
 static int nemRead(const char *path, char *buf, size_t size, off_t offset,
                     struct fuse_file_info *fi)
 {
@@ -285,6 +354,49 @@ static int nemRead(const char *path, char *buf, size_t size, off_t offset,
         return res;
 }
 
+//from hello.c
+static int nemReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
+                         off_t offset, struct fuse_file_info *fi)
+{
+        (void) offset;
+        (void) fi;
+        if (strcmp(path, "/") != 0)
+                return -ENOENT;
+        filler(buf, ".", NULL, 0);
+        filler(buf, "..", NULL, 0);
+        filler(buf, globalFilePath + 1, NULL, 0);
+        return 0;
+}
+
+int nemRelease(char* path, struct fuse_file_info* fi){
+  /*TODO: Remove reference to open file,
+          Remove flags from fi
+  */
+  return 0;
+}
+
+int nemReleasedir(char* path, struct fuse_file_info* fi){
+  /*TODO: Remove flags from fi,
+          Remove other references to open directory
+  */
+  return 0;
+}
+
+int rename(char* from, char* to){
+  /*TODO: Get path of 'from',
+          Open file inode and edit reference to name,
+          Overwrite file with new name from 'to'
+  */
+  return 0;
+}
+
+int statfs(char* path, struct statvfs* stbuf){
+  /*TODO: Open inode from path,
+          Apply values from inode to corresponding fields in stbuf
+  */
+  return 0;
+}
+
 int nemUnlink(const char* path){
   /*TODO: parse through path name to get containing folder,
           remove filename_to_inode_dict entry for file in containing folder,
@@ -299,7 +411,7 @@ int nemUnlink(const char* path){
   fclose(fd);
   fd = fopen(parent, "w+");
 
-  char* tmp = malloc(directory->filename_to_inode_dict);
+  char* tmp = malloc(strlen(directory->filename_to_inode_dict));
   char* fileArray = malloc(directory->filename_to_inode_dict);
   struct fileInode* file = fileInfo(path);
   char* fileName = file->name;
@@ -307,7 +419,7 @@ int nemUnlink(const char* path){
   tmp = strtok(directory->filename_to_inode_dict, ",{}");
   char* fileEntry = concat(concat(fileName, ":"), fileLocation);
   while(tmp != NULL){
-    if(strcmp(tmp, concat("d:", fileEntry)==0 || strcmp(tmp, concat("f:", fileEntry)==0))){
+    if(strcmp(tmp, concat("d:", fileEntry))==0 || strcmp(tmp, concat("f:", fileEntry))==0))){
       continue;
     }
     strcat(fileArray, ",");
@@ -320,8 +432,6 @@ int nemUnlink(const char* path){
   fclose(fd);
 
   int j;
-  int i = 0;
-
   for(j = 1; j < 26; ++j){
     if(((atoi(fileLocation) + 399)/ 400) == j){
       char* freeBlock = concat(concat(globalFilePath, globalBlockName), j);
@@ -331,7 +441,7 @@ int nemUnlink(const char* path){
       free(freeBlock);
     }
   }
-  fd = fopen(concat(concate(globalFilePath,globalBlockName), fileLocation), "w+");
+  fd = fopen(concat(concat(globalFilePath,globalBlockName), fileLocation), "w+");
   char* buffer[globalMaxFileSize];
   memset(buffer, "0", globalMaxFileSize);
   fwrite(buffer, globalMaxFileSize, sizeof(char), fd);
@@ -340,18 +450,30 @@ int nemUnlink(const char* path){
 
 }
 
+int write(char* path, char* buf, size_t size, off_t offset, struct fuse_file_info* fi){
+  /*TODO: Open the open file based on fi,
+          Seek through file based on offset,
+          Write to file the contents of buf
+
+
+  */
+  return 0;
+}
+
 struct fuse_operations nemOperations = {
-  //.init = nemInit,
+  .init    = nemInit,
   .getattr = nemGetattr,
   .readdir = nemReaddir,
   .open    = nemOpen,
   .read    = nemRead,
+  .mkdir   = nemMkdir,
+  .opendir = nemOpendir,
+  .unlink  = nemUnlink,
 };
 
 int main(int argc, char* argv[]){
 
   printf("Inside Main\n");
   umask(0);
-  nemInit();
   return fuse_main(argc, argv, &nemOperations, NULL);
 }
